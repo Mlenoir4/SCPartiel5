@@ -1,39 +1,71 @@
+from abc import ABC, abstractmethod
+from typing import List
+
+
+class Package:
+    def __init__(self, weight: float, distance: float):
+        if weight < 0:
+            raise ValueError("Invalid weight!")
+        self.weight = weight
+        self.distance = distance
+
+    def base_price(self) -> float:
+        base_price = self.distance * 0.1
+        surcharge = 5 if self.weight > 10 else 3 if self.weight > 5 else 0
+        return base_price + surcharge
+
+
+class IPricingStrategy(ABC):
+    @abstractmethod
+    def calculate(self, price: float) -> float:
+        pass
+
+
+class UrgencyPricing(IPricingStrategy):
+    def __init__(self, urgent: bool):
+        self.urgent = urgent
+
+    def calculate(self, price: float) -> float:
+        return price * 1.5 if self.urgent else price
+
+
+class DiscountPricing(IPricingStrategy):
+    DISCOUNTS = {"VIP": 0.8, "Business": 0.9}
+    
+    def __init__(self, customer_type: str):
+        self.discount = self.DISCOUNTS.get(customer_type, 1.0)
+
+    def calculate(self, price: float) -> float:
+        return price * self.discount
+
+
+class BulkPricing(IPricingStrategy):
+    def __init__(self, package_count: int):
+        self.package_count = package_count
+
+    def calculate(self, price: float) -> float:
+        return price * 0.95 if self.package_count > 3 else price
+
+
 class DeliveryService:
-    class Package:
-        def __init__(self, weight: float, distance: float):
-            self.weight = weight
-            self.distance = distance
+    def __init__(self, strategies: List[IPricingStrategy]):
+        self.strategies = strategies
 
-    def calculate_delivery_price(self, packages: list[Package], customer_type: str, urgent: bool) -> float:
-        total = 0.0
-        for pkg in packages:
-            if pkg.weight < 0:
-                print("Invalid weight!")
-                return -1
-            
-            base = pkg.distance * 0.1
-            if pkg.weight > 10:
-                base += 5
-            elif pkg.weight > 5:
-                base += 3
-            
-            if urgent:
-                base *= 1.5
-            
-            if customer_type == "VIP":
-                base *= 0.8
-            elif customer_type == "Business":
-                base *= 0.9
-            
-            total += base
-        
-        if len(packages) > 3:
-            total *= 0.95
-        
-        return total
+    def calculate_delivery_price(self, packages: List[Package]) -> float:
+        total_price = sum(pkg.base_price() for pkg in packages)
+        for strategy in self.strategies:
+            total_price = strategy.calculate(total_price)
+        return total_price
 
-    def print_invoice(self, packages: list[Package], customer_type: str) -> None:
-        price = self.calculate_delivery_price(packages, customer_type, False)
-        print(f"Total: {price}")
-        if price > 100:
-            print("Apply special discount next time!")
+    def generate_invoice(self, packages: List[Package]) -> str:
+        total_price = self.calculate_delivery_price(packages)
+        invoice = f"Total: {total_price}\n"
+        if total_price > 100:
+            invoice += "Apply special discount next time!\n"
+        return invoice
+
+
+packages = [Package(8, 100), Package(12, 200)]
+strategies = [UrgencyPricing(urgent=True), DiscountPricing("VIP"), BulkPricing(len(packages))]
+delivery_service = DeliveryService(strategies)
+print(delivery_service.generate_invoice(packages))
